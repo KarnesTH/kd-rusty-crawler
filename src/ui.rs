@@ -1,3 +1,6 @@
+use crate::{Game, Player};
+use std::io::Write;
+
 #[cfg(unix)]
 fn get_terminal_size() -> (u16, u16) {
     use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
@@ -44,8 +47,9 @@ impl UI {
         UI { width, height }
     }
 
-    fn clear_screen(&self) {
+    pub fn clear_screen(&self) {
         print!("\x1B[2J\x1B[H");
+        std::io::stdout().flush().unwrap();
     }
 
     pub fn draw_menu(&self) {
@@ -119,5 +123,125 @@ impl UI {
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
         input.trim().to_string()
+    }
+
+    pub fn draw_game(&self, game: &Game) {
+        self.clear_screen();
+
+        let horizontal_line = "─".repeat(self.width as usize - 2);
+        println!("┌{}┐", horizontal_line);
+
+        let empty_line = format!("│{}│", " ".repeat(self.width as usize - 2));
+
+        self.draw_player_stats(&game.player);
+        println!("{}", empty_line);
+
+        for _ in 0..15 {
+            println!("{}", empty_line);
+        }
+
+        let commands = "Befehle: (i)nventar (q)uit";
+        println!(
+            "│ {}{}│",
+            commands,
+            " ".repeat(self.width as usize - commands.len() - 3)
+        );
+
+        println!("└{}┘", horizontal_line);
+    }
+
+    fn draw_player_stats(&self, player: &Player) {
+        let stats = format!(
+            " {} | Level: {} | HP: {} | ATK: {} | DEF: {} | XP: {}/{}",
+            player.name,
+            player.level,
+            player.health,
+            player.attack,
+            player.defense,
+            player.experience,
+            player.experience_to_next_level
+        );
+        println!("│{}│", stats.pad_right(self.width as usize - 2));
+    }
+
+    pub fn show_cursor(&self) {
+        print!("\x1B[?25h");
+        std::io::stdout().flush().unwrap();
+    }
+
+    pub fn hide_cursor(&self) {
+        print!("\x1B[?25l");
+        std::io::stdout().flush().unwrap();
+    }
+
+    pub fn get_input_at(&self, row: u16, col: u16) -> String {
+        print!("\x1B[{};{}H", row, col);
+        std::io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+        input.trim().to_string()
+    }
+
+    pub fn get_menu_input(&self) -> String {
+        let input_row = self.height - 2;
+        let input_col = (self.width / 2) as u16;
+
+        self.get_input_at(input_row, input_col)
+    }
+
+    pub fn get_player_name(&self) -> String {
+        self.clear_screen();
+        self.draw_name_input_screen();
+
+        let name_prompt = "Name: ";
+        let total_width = name_prompt.len() + 20;
+        let start_pos = (self.width as usize - total_width) / 2;
+        let cursor_pos = start_pos + name_prompt.len() + 1;
+        let input_row = self.height / 2 + 1;
+
+        self.get_input_at(input_row, cursor_pos as u16)
+    }
+
+    fn draw_name_input_screen(&self) {
+        let horizontal_line = "─".repeat(self.width as usize - 2);
+        println!("┌{}┐", horizontal_line);
+
+        let empty_line = format!("│{}│", " ".repeat(self.width as usize - 2));
+
+        for _ in 0..self.height / 3 {
+            println!("{}", empty_line);
+        }
+
+        self.draw_centered_text("Wie soll dein Held heißen?");
+        println!("{}", empty_line);
+        self.draw_centered_text("Name: ____________________");
+
+        for _ in 0..self.height / 3 {
+            println!("{}", empty_line);
+        }
+
+        println!("└{}┘", horizontal_line);
+    }
+
+    pub fn get_game_input(&self) -> String {
+        let input_row = self.height - 2;
+        let input_col = "Befehle: ".len() as u16 + 2;
+
+        self.get_input_at(input_row, input_col)
+    }
+}
+
+trait PadString {
+    fn pad_right(&self, width: usize) -> String;
+}
+
+impl PadString for String {
+    fn pad_right(&self, width: usize) -> String {
+        if self.len() >= width {
+            self.clone()
+        } else {
+            format!("{}{}", self, " ".repeat(width - self.len()))
+        }
     }
 }
