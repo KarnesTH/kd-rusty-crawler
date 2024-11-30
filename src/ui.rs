@@ -33,28 +33,48 @@ fn get_terminal_size() -> (u16, u16) {
     }
 }
 
-pub struct Terminal {
+pub struct UI {
     width: u16,
     height: u16,
 }
 
-impl Terminal {
+impl UI {
     pub fn new() -> Self {
         let (width, height) = get_terminal_size();
-        Terminal { width, height }
+        UI { width, height }
     }
 
     fn clear_screen(&self) {
         print!("\x1B[2J\x1B[H");
     }
 
-    pub fn run(&self) {
+    pub fn draw_menu(&self) {
         self.clear_screen();
-        self.draw_menu();
-        self.handle_input();
+
+        let horizontal_line = "─".repeat(self.width as usize - 2);
+
+        println!("┌{}┐", horizontal_line);
+
+        let empty_line = format!("│{}│", " ".repeat(self.width as usize - 2));
+
+        let vertical_padding = (self.height - 10) / 2;
+
+        for _ in 0..vertical_padding {
+            println!("{}", empty_line);
+        }
+
+        self.draw_title();
+        println!("{}", empty_line);
+        self.draw_menu_options();
+
+        for _ in 0..2 {
+            println!("{}", empty_line);
+        }
+
+        println!("└{}┘", horizontal_line);
     }
 
-    fn draw_title_ascii(&self) {
+    fn draw_title(&self) {
         let title = vec![
             r" ____  _   _ ____ _______   __",
             r"|  _ \| | | / ___|_   _\ \ / /",
@@ -75,40 +95,14 @@ impl Terminal {
             );
         }
 
-        let crawler = "C R A W L E R";
-        let version = format!("v{}", env!("CARGO_PKG_VERSION"));
-
-        self.draw_centered_text(crawler);
-        self.draw_centered_text(&version);
+        self.draw_centered_text("C R A W L E R");
+        self.draw_centered_text(&format!("v{}", env!("CARGO_PKG_VERSION")));
     }
 
-    fn draw_menu(&self) {
-        let horizontal_line = "─".repeat(self.width as usize - 2);
-
-        println!("┌{}┐", horizontal_line);
-
-        let empty_line = format!("│{}│", " ".repeat(self.width as usize - 2));
-
-        let vertical_padding = (self.height - 10) / 2;
-
-        for _ in 0..vertical_padding {
-            println!("{}", empty_line);
-        }
-
-        self.draw_title_ascii();
-
-        println!("{}", empty_line);
-        println!("{}", empty_line);
-
+    fn draw_menu_options(&self) {
         self.draw_centered_text("1. New Game");
         self.draw_centered_text("2. Load Game");
         self.draw_centered_text("3. Exit");
-
-        for _ in 0..(vertical_padding - 1) {
-            println!("{}", empty_line);
-        }
-
-        println!("└{}┘", horizontal_line);
     }
 
     fn draw_centered_text(&self, text: &str) {
@@ -121,20 +115,9 @@ impl Terminal {
         );
     }
 
-    fn handle_input(&self) {
-        loop {
-            let mut input = String::new();
-            std::io::stdin().read_line(&mut input).unwrap();
-
-            match input.trim() {
-                "1" => println!("Starting new game..."),
-                "2" => println!("Loading game..."),
-                "3" => {
-                    println!("Goodbye!");
-                    std::process::exit(0);
-                }
-                _ => println!("Invalid input! Valid options are 1, 2, or 3."),
-            }
-        }
+    pub fn get_input(&self) -> String {
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+        input.trim().to_string()
     }
 }

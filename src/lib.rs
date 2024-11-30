@@ -1,5 +1,7 @@
+pub mod item;
 pub mod player;
-pub mod terminal;
+pub mod ui;
 
+pub use item::{Item, ItemType};
 pub use player::Player;
-pub use terminal::Terminal;
+pub use ui::UI;
