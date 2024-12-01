@@ -128,40 +128,77 @@ impl UI {
     pub fn draw_game(&self, game: &Game) {
         self.clear_screen();
 
-        let horizontal_line = "─".repeat(self.width as usize - 2);
-        println!("┌{}┐", horizontal_line);
+        let map_width = ((self.width as usize - 6) * 2) / 3;
+        let stats_width = (self.width as usize - 6) - map_width - 3;
+        let stats_rows = 9;
 
-        let empty_line = format!("│{}│", " ".repeat(self.width as usize - 2));
+        println!("┌{}┐", "─".repeat(self.width as usize - 2));
 
-        self.draw_player_stats(&game.player);
-        println!("{}", empty_line);
+        println!(
+            "│ ╔{}╗ ╔{}╗ │",
+            "═".repeat(map_width),
+            "═".repeat(stats_width)
+        );
 
-        for _ in 0..15 {
-            println!("{}", empty_line);
+        let content_height = stats_rows.min(self.height as usize);
+        for i in 0..content_height {
+            print!("│ ║{}║ ║", " ".repeat(map_width));
+            self.draw_stats_row(&game.player, i, stats_width);
+            println!("║ │");
         }
 
-        let commands = "Commands: (i)nventar (q)uit";
         println!(
-            "│ {}{}│",
-            commands,
-            " ".repeat(self.width as usize - commands.len() - 3)
+            "│ ╚{}╝ ╚{}╝ │",
+            "═".repeat(map_width),
+            "═".repeat(stats_width)
         );
 
-        println!("└{}┘", horizontal_line);
+        println!(
+            "│ {}│",
+            "Messages:".to_string().pad_right(self.width as usize - 3)
+        );
+        println!("│{}│", " ".repeat(self.width as usize - 2));
+
+        println!(
+            "│ {}│",
+            "Command: _".to_string().pad_right(self.width as usize - 3)
+        );
+
+        println!("└{}┘", "─".repeat(self.width as usize - 2));
     }
 
-    fn draw_player_stats(&self, player: &Player) {
-        let stats = format!(
-            " {} | Level: {} | HP: {} | ATK: {} | DEF: {} | XP: {}/{}",
-            player.name,
-            player.level,
-            player.health,
-            player.attack,
-            player.defense,
-            player.experience,
-            player.experience_to_next_level
-        );
-        println!("│{}│", stats.pad_right(self.width as usize - 2));
+    fn draw_map_row(&self, row: usize, width: usize) {
+        print!("{}", ".".repeat(width));
+    }
+
+    fn draw_stats_row(&self, player: &Player, row: usize, width: usize) {
+        let stats = match row {
+            0 => " Stats:".to_string(),
+            1 => format!("    HP: {}/100", player.health),
+            2 => format!("    Level: {}", player.level),
+            3 => format!(
+                "    XP: {}/{}",
+                player.experience, player.experience_to_next_level
+            ),
+            4 => format!("    ATK: {}", player.attack),
+            5 => format!("    DEF: {}", player.defense),
+            6 => " Equipment:".to_string(),
+            7 => format!(
+                "    Weapon: {}",
+                player.equipped_weapon.as_ref().map_or("None", |w| &w.name)
+            ),
+            8 => format!(
+                "    Armor: {}",
+                player.equipped_armor.as_ref().map_or("None", |a| &a.name)
+            ),
+            _ => String::new(),
+        };
+
+        if !stats.is_empty() {
+            print!("{}", stats.pad_right(width));
+        } else {
+            print!("{}", " ".repeat(width));
+        }
     }
 
     pub fn show_cursor(&self) {
