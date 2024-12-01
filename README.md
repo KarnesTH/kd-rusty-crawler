@@ -22,7 +22,7 @@ Rusty Crawler is a classic roguelike dungeon crawler that runs entirely in your 
 git clone https://github.com/KarnesTH/kd-rusty-crawler.git
 
 # Navigate to the project directory
-cd rusty-crawler
+cd kd-rusty-crawler
 
 # Build and run the game
 cargo run

@@ -140,7 +140,7 @@ impl UI {
             println!("{}", empty_line);
         }
 
-        let commands = "Befehle: (i)nventar (q)uit";
+        let commands = "Commands: (i)nventar (q)uit";
         println!(
             "│ {}{}│",
             commands,
@@ -213,7 +213,7 @@ impl UI {
             println!("{}", empty_line);
         }
 
-        self.draw_centered_text("Wie soll dein Held heißen?");
+        self.draw_centered_text("What should your hero be called?");
         println!("{}", empty_line);
         self.draw_centered_text("Name: ____________________");
 
@@ -226,7 +226,7 @@ impl UI {
 
     pub fn get_game_input(&self) -> String {
         let input_row = self.height - 2;
-        let input_col = "Befehle: ".len() as u16 + 2;
+        let input_col = (self.width - 4) as u16;
 
         self.get_input_at(input_row, input_col)
     }
