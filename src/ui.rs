@@ -1,6 +1,6 @@
 //! User Interface module for terminal-based rendering and interaction.
 
-use crate::get_terminal_size;
+use crate::{get_terminal_size, map::Tile, Game};
 use std::io::Write;
 
 /// Main UI structure handling terminal rendering and user interaction.
@@ -10,9 +10,11 @@ pub struct UI {
 }
 
 /// Available content types for the UI system.
-pub enum Content {
+pub enum Content<'a> {
     /// Main menu display with title and options
     MainMenu,
+    /// Active game screen with map, stats and messages
+    Game(&'a Game),
     /// Empty content, showing only the frame
     Empty,
 }
@@ -51,6 +53,7 @@ impl UI {
     pub fn update_content(&self, content: Content) {
         match content {
             Content::MainMenu => self.draw_main_menu(),
+            Content::Game(game) => self.draw_game_screen(game),
             Content::Empty => {
                 for row in 2..self.height - 1 {
                     print!(
@@ -138,6 +141,96 @@ impl UI {
         print!("\x1B[{};{}H> ", input_row, input_col);
     }
 
+    /// Draws the main game screen with map, stats, messages and command line.
+    ///
+    /// # Arguments
+    /// * `game` - Reference to the current game state
+    fn draw_game_screen(&self, game: &Game) {
+        let map_width = ((self.width as usize - 6) * 2) / 3;
+        let stats_width = (self.width as usize - 6) - map_width - 3;
+
+        print!("\x1B[2;1H");
+        println!(
+            "│ ╔{}╗ ╔{}╗ │",
+            "═".repeat(map_width),
+            "═".repeat(stats_width)
+        );
+
+        let remaining_space = map_width - game.map.width as usize;
+        let padding = " ".repeat(remaining_space);
+
+        for y in 0..game.map.height as usize {
+            print!("│ ║");
+
+            for x in 0..game.map.width as usize {
+                let tile = game
+                    .map
+                    .get_tile(x as i32, y as i32)
+                    .unwrap_or(&Tile::Empty);
+                let symbol = match tile {
+                    Tile::Floor => '.',
+                    Tile::Wall => '#',
+                    Tile::Door => '+',
+                    Tile::Empty => ' ',
+                };
+                print!("{}", symbol);
+            }
+            print!("{}║ ║", padding);
+
+            let stat_line = match y {
+                0 => "Stats:".to_string(),
+                1 => format!("HP: {}/100", game.player.health),
+                2 => format!("Level: {}", game.player.level),
+                3 => format!(
+                    "XP: {}/{}",
+                    game.player.experience, game.player.experience_to_next_level
+                ),
+                4 => format!("ATK: {}", game.player.attack),
+                5 => format!("DEF: {}", game.player.defense),
+                _ => String::new(),
+            };
+
+            if !stat_line.is_empty() {
+                let stat_padding = (stats_width - stat_line.len()) / 2;
+                print!(
+                    "{}{}{}",
+                    " ".repeat(stat_padding),
+                    stat_line,
+                    " ".repeat(stats_width - stat_line.len() - stat_padding)
+                );
+            } else {
+                print!("{}", " ".repeat(stats_width));
+            }
+            println!("║ │");
+        }
+
+        println!(
+            "│ ╚{}╝ ╚{}╝ │",
+            "═".repeat(map_width),
+            "═".repeat(stats_width)
+        );
+
+        println!(
+            "│ {}│",
+            format!("Messages{}", "─".repeat(self.width as usize - 11))
+                .pad_right(self.width as usize - 3)
+        );
+
+        for _ in 0..(self.height - 20) {
+            println!("│{}│", " ".repeat(self.width as usize - 2));
+        }
+
+        print!("\x1B[{};1H", self.height - 1);
+        print!(
+            "│ {}│",
+            "Command: ".to_string().pad_right(self.width as usize - 3)
+        );
+
+        print!("\x1B[{};11H", self.height - 1);
+
+        std::io::stdout().flush().unwrap();
+    }
+
     /// Gets user input from the current cursor position.
     ///
     /// # Returns
@@ -168,5 +261,31 @@ impl Default for UI {
     /// Provides default initialization for UI struct.
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Trait for padding strings with spaces to a specific width.
+///
+/// This trait provides functionality to right-pad strings with spaces
+/// to achieve a specific total width.
+trait PadString {
+    /// Pads the string with spaces on the right side to reach the specified width.
+    ///
+    /// # Arguments
+    /// * `width` - The desired total width of the string
+    ///
+    /// # Returns
+    /// * If string length >= width: Returns a clone of the original string
+    /// * If string length < width: Returns string padded with spaces to reach width
+    fn pad_right(&self, width: usize) -> String;
+}
+
+impl PadString for String {
+    fn pad_right(&self, width: usize) -> String {
+        if self.len() >= width {
+            self.clone()
+        } else {
+            format!("{}{}", self, " ".repeat(width - self.len()))
+        }
     }
 }
