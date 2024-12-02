@@ -1,4 +1,4 @@
-use crate::{Game, Player};
+use crate::{map::Tile, Game, Map, Player};
 use std::io::Write;
 
 #[cfg(unix)]
@@ -130,7 +130,6 @@ impl UI {
 
         let map_width = ((self.width as usize - 6) * 2) / 3;
         let stats_width = (self.width as usize - 6) - map_width - 3;
-        let stats_rows = 9;
 
         println!("┌{}┐", "─".repeat(self.width as usize - 2));
 
@@ -140,9 +139,10 @@ impl UI {
             "═".repeat(stats_width)
         );
 
-        let content_height = stats_rows.min(self.height as usize);
-        for i in 0..content_height {
-            print!("│ ║{}║ ║", " ".repeat(map_width));
+        for i in 0..game.map.height as usize {
+            print!("│ ║");
+            self.draw_map_row(&game.map, i, map_width);
+            print!("║ ║");
             self.draw_stats_row(&game.player, i, stats_width);
             println!("║ │");
         }
@@ -167,8 +167,27 @@ impl UI {
         println!("└{}┘", "─".repeat(self.width as usize - 2));
     }
 
-    fn draw_map_row(&self, row: usize, width: usize) {
-        print!("{}", ".".repeat(width));
+    fn draw_map_row(&self, map: &Map, row: usize, width: usize) {
+        let mut line = String::with_capacity(width);
+
+        let h_padding = (width - map.width as usize) / 2;
+
+        line.extend(std::iter::repeat(' ').take(h_padding));
+
+        for x in 0..map.width {
+            if let Some(tile) = map.get_tile(x, row as i32) {
+                line.push(match tile {
+                    Tile::Floor => '.',
+                    Tile::Wall => '#',
+                    Tile::Door => '+',
+                    Tile::Empty => ' ',
+                });
+            }
+        }
+
+        line.extend(std::iter::repeat(' ').take(width - line.len()));
+
+        print!("{}", line);
     }
 
     fn draw_stats_row(&self, player: &Player, row: usize, width: usize) {

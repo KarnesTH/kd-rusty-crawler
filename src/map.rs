@@ -39,4 +39,19 @@ impl Map {
             self.tiles[y as usize][x as usize] = tile;
         }
     }
+
+    pub fn create_room(&mut self, room: Room) {
+        let x = (self.width - room.width) / 2;
+        let y = (self.height - room.height) / 2;
+
+        for i in y..y + room.height {
+            for j in x..x + room.width {
+                if i == y || i == y + room.height - 1 || j == x || j == x + room.width - 1 {
+                    self.set_tile(j, i, Tile::Wall);
+                } else {
+                    self.set_tile(j, i, Tile::Floor);
+                }
+            }
+        }
+    }
 }

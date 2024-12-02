@@ -1,4 +1,4 @@
-use kd_rusty_crawler::{Game, UI};
+use kd_rusty_crawler::{Game, Map, Room, UI};
 
 fn main() {
     let ui = UI::new();
@@ -31,7 +31,9 @@ fn main() {
             match input.as_str() {
                 "1" => {
                     let player_name = ui.get_player_name();
-                    game = Some(Game::new(player_name));
+                    let mut map = Map::new(40, 20);
+                    map.create_room(Room::new(20, 12));
+                    game = Some(Game::new(player_name, map));
                 }
                 "2" => {
                     println!("Loading game...");
