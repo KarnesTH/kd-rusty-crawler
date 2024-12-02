@@ -1,54 +1,63 @@
-use kd_rusty_crawler::{Game, Map, Room, UI};
+use kd_rusty_crawler::{ui::Content, Game, Map, Room, UI};
+
+enum AppState {
+    Menu,
+    InGame(Game),
+}
 
 fn main() {
     let ui = UI::new();
-    let mut game = None;
-    ui.hide_cursor();
+    let mut app_state = AppState::Menu;
+
+    ui.draw_frame();
+    ui.update_content(Content::MainMenu);
 
     loop {
-        ui.clear_screen();
-        if let Some(ref mut g) = game {
-            ui.clear_screen();
-            ui.draw_game(g);
-            let input = ui.get_game_input();
-            ui.clear_screen();
+        let input = ui.get_input();
 
-            match input.as_str() {
-                "q" => {
-                    game = None;
-                }
-                "i" => {
-                    println!("Inventory");
-                }
-                _ => {}
-            }
-        } else {
-            ui.clear_screen();
-            ui.draw_menu();
-            let input = ui.get_menu_input();
-            ui.clear_screen();
+        match &mut app_state {
+            AppState::Menu => {
+                match input.as_str() {
+                    "1" => {
+                        ui.update_content(Content::Empty);
+                        ui.show_dialog("Enter your hero's name:");
+                        let player_name = ui.get_input();
 
-            match input.as_str() {
-                "1" => {
-                    let player_name = ui.get_player_name();
-                    let mut map = Map::new(40, 20);
-                    map.create_room(Room::new(20, 12));
-                    game = Some(Game::new(player_name, map));
-                }
-                "2" => {
-                    println!("Loading game...");
-                }
-                "3" => {
-                    ui.clear_screen();
-                    ui.show_cursor();
-                    println!("Goodbye!");
-                    break;
-                }
-                _ => {
-                    println!("Invalid input! Please select a number between 1 and 3.");
+                        let mut map = Map::new(40, 15);
+                        map.create_room(Room::new(40, 15));
+
+                        app_state = AppState::InGame(Game::new(player_name, map));
+                        // TODO: Game Content anzeigen
+                    }
+                    "2" => {
+                        ui.update_content(Content::Empty);
+                        ui.show_dialog("Load game not implemented yet!");
+                        std::thread::sleep(std::time::Duration::from_secs(2));
+                        ui.update_content(Content::MainMenu);
+                    }
+                    "3" | "q" => {
+                        ui.update_content(Content::Empty);
+                        ui.show_dialog("Thanks for playing!");
+                        break;
+                    }
+                    _ => {
+                        ui.show_dialog("Please select 1-3");
+                        ui.update_content(Content::MainMenu);
+                    }
                 }
             }
-        }
+            AppState::InGame(game) => {
+                match input.as_str() {
+                    "q" => {
+                        app_state = AppState::Menu;
+                        ui.update_content(Content::MainMenu);
+                    }
+                    _ => {
+                        game.update();
+                        // TODO: Game Content updaten
+                    }
+                }
+            }
+        };
     }
-    ui.show_cursor();
 }

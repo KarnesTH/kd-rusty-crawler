@@ -1,85 +1,92 @@
-use crate::{map::Tile, Game, Map, Player};
+//! User Interface module for terminal-based rendering and interaction.
+
+use crate::get_terminal_size;
 use std::io::Write;
 
-#[cfg(unix)]
-fn get_terminal_size() -> (u16, u16) {
-    use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
-    let mut ws = winsize {
-        ws_row: 0,
-        ws_col: 0,
-        ws_xpixel: 0,
-        ws_ypixel: 0,
-    };
-
-    if unsafe { ioctl(STDOUT_FILENO, TIOCGWINSZ, &mut ws) } == 0 {
-        (ws.ws_col, ws.ws_row)
-    } else {
-        (80, 24)
-    }
-}
-
-#[cfg(windows)]
-fn get_terminal_size() -> (u16, u16) {
-    use winapi::um::winbase::GetStdHandle;
-    use winapi::um::winbase::STD_OUTPUT_HANDLE;
-    use winapi::um::wincon::{GetConsoleScreenBufferInfo, CONSOLE_SCREEN_BUFFER_INFO};
-
-    let handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
-    let mut info = CONSOLE_SCREEN_BUFFER_INFO::default();
-
-    if unsafe { GetConsoleScreenBufferInfo(handle, &mut info) } != 0 {
-        let width = (info.srWindow.Right - info.srWindow.Left + 1) as u16;
-        let height = (info.srWindow.Bottom - info.srWindow.Top + 1) as u16;
-        (width, height)
-    } else {
-        (80, 24)
-    }
-}
-
+/// Main UI structure handling terminal rendering and user interaction.
 pub struct UI {
     width: u16,
     height: u16,
 }
 
+/// Available content types for the UI system.
+pub enum Content {
+    /// Main menu display with title and options
+    MainMenu,
+    /// Empty content, showing only the frame
+    Empty,
+}
+
 impl UI {
+    /// Creates a new UI instance with current terminal dimensions.
+    ///
+    /// # Panics
+    /// When terminal size cannot be determined.
     pub fn new() -> Self {
-        let (width, height) = get_terminal_size();
+        let (width, height) = get_terminal_size().unwrap();
         UI { width, height }
     }
 
-    pub fn clear_screen(&self) {
-        print!("\x1B[2J\x1B[H");
-        std::io::stdout().flush().unwrap();
-    }
-
-    pub fn draw_menu(&self) {
-        self.clear_screen();
-
+    /// Draws the initial frame that remains constant throughout the application.
+    ///
+    /// Creates a box using Unicode box-drawing characters that fills the terminal.
+    pub fn draw_frame(&self) {
         let horizontal_line = "─".repeat(self.width as usize - 2);
 
         println!("┌{}┐", horizontal_line);
 
         let empty_line = format!("│{}│", " ".repeat(self.width as usize - 2));
-
-        let vertical_padding = (self.height - 10) / 2;
-
-        for _ in 0..vertical_padding {
+        for _ in 1..self.height - 1 {
             println!("{}", empty_line);
         }
 
-        self.draw_title();
-        println!("{}", empty_line);
-        self.draw_menu_options();
-
-        for _ in 0..2 {
-            println!("{}", empty_line);
-        }
-
-        println!("└{}┘", horizontal_line);
+        print!("└{}┘", horizontal_line);
+        std::io::stdout().flush().unwrap();
     }
 
-    fn draw_title(&self) {
-        let title = vec![
+    /// Updates the content within the frame based on the provided content type.
+    ///
+    /// # Arguments
+    /// * `content` - The type of content to display
+    pub fn update_content(&self, content: Content) {
+        match content {
+            Content::MainMenu => self.draw_main_menu(),
+            Content::Empty => {
+                for row in 2..self.height - 1 {
+                    print!(
+                        "\x1B[{};{}H│{}│",
+                        row,
+                        1,
+                        " ".repeat(self.width as usize - 2)
+                    );
+                }
+                std::io::stdout().flush().unwrap();
+            }
+        }
+        std::io::stdout().flush().unwrap();
+    }
+
+    /// Shows a centered dialog message for a specified duration.
+    ///
+    /// # Arguments
+    /// * `message` - The message to display in the dialog
+    pub fn show_dialog(&self, message: &str) {
+        let col = (self.width as usize / 2) - (message.len() / 2);
+        let row = self.height / 2;
+
+        print!("\x1B[{};{}H{}", row, col, message);
+        std::io::stdout().flush().unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    }
+
+    /// Draws the main menu content with ASCII art title and options.
+    ///
+    /// Displays:
+    /// - ASCII art title
+    /// - Version number
+    /// - Menu options
+    fn draw_main_menu(&self) {
+        let title = [
             r" ____  _   _ ____ _______   __",
             r"|  _ \| | | / ___|_   _\ \ / /",
             r"| |_) | | | \___ \ | |  \ V / ",
@@ -87,217 +94,79 @@ impl UI {
             r"|_| \_\\___/|____/ |_|   |_|  ",
         ];
 
-        let max_title_width = title.iter().map(|line| line.len()).max().unwrap_or(0);
-        let left_padding = (self.width as usize - max_title_width - 2) / 2;
+        let content_start_row = self.height / 2 - 5;
 
-        for line in title {
-            println!(
+        for (i, line) in title.iter().enumerate() {
+            let padding = (self.width as usize - line.len()) / 2;
+            print!("\x1B[{};{}H", content_start_row + i as u16, 1);
+            print!(
                 "│{}{}{}│",
-                " ".repeat(left_padding),
+                " ".repeat(padding),
                 line,
-                " ".repeat(self.width as usize - left_padding - line.len() - 2)
+                " ".repeat(self.width as usize - padding - line.len() - 2)
             );
         }
 
-        self.draw_centered_text("C R A W L E R");
-        self.draw_centered_text(&format!("v{}", env!("CARGO_PKG_VERSION")));
+        let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+
+        let menu_items = [
+            "C R A W L E R",
+            &version,
+            "",
+            "1. New Game",
+            "2. Load Game",
+            "3. Exit",
+        ];
+
+        for (i, item) in menu_items.iter().enumerate() {
+            let padding = (self.width as usize - item.len()) / 2;
+            print!(
+                "\x1B[{};{}H",
+                content_start_row + title.len() as u16 + i as u16,
+                1
+            );
+            print!(
+                "│{}{}{}│",
+                " ".repeat(padding),
+                item,
+                " ".repeat(self.width as usize - padding - item.len() - 2)
+            );
+        }
+
+        let input_row = self.height - 2;
+        let input_col = self.width / 2;
+        print!("\x1B[{};{}H> ", input_row, input_col);
     }
 
-    fn draw_menu_options(&self) {
-        self.draw_centered_text("1. New Game");
-        self.draw_centered_text("2. Load Game");
-        self.draw_centered_text("3. Exit");
-    }
-
-    fn draw_centered_text(&self, text: &str) {
-        let padding = (self.width as usize - text.len() - 2) / 2;
-        println!(
-            "│{}{}{}│",
-            " ".repeat(padding),
-            text,
-            " ".repeat(self.width as usize - padding - text.len() - 2)
-        );
-    }
-
+    /// Gets user input from the current cursor position.
+    ///
+    /// # Returns
+    /// A trimmed string containing the user's input.
     pub fn get_input(&self) -> String {
+        std::io::stdout().flush().unwrap();
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
         input.trim().to_string()
     }
+}
 
-    pub fn draw_game(&self, game: &Game) {
-        self.clear_screen();
-
-        let map_width = ((self.width as usize - 6) * 2) / 3;
-        let stats_width = (self.width as usize - 6) - map_width - 3;
-
-        println!("┌{}┐", "─".repeat(self.width as usize - 2));
-
-        println!(
-            "│ ╔{}╗ ╔{}╗ │",
-            "═".repeat(map_width),
-            "═".repeat(stats_width)
-        );
-
-        for i in 0..game.map.height as usize {
-            print!("│ ║");
-            self.draw_map_row(&game.map, i, map_width);
-            print!("║ ║");
-            self.draw_stats_row(&game.player, i, stats_width);
-            println!("║ │");
-        }
-
-        println!(
-            "│ ╚{}╝ ╚{}╝ │",
-            "═".repeat(map_width),
-            "═".repeat(stats_width)
-        );
-
-        println!(
-            "│ {}│",
-            "Messages:".to_string().pad_right(self.width as usize - 3)
-        );
-        println!("│{}│", " ".repeat(self.width as usize - 2));
-
-        println!(
-            "│ {}│",
-            "Command: _".to_string().pad_right(self.width as usize - 3)
-        );
-
-        println!("└{}┘", "─".repeat(self.width as usize - 2));
-    }
-
-    fn draw_map_row(&self, map: &Map, row: usize, width: usize) {
-        let mut line = String::with_capacity(width);
-
-        let h_padding = (width - map.width as usize) / 2;
-
-        line.extend(std::iter::repeat(' ').take(h_padding));
-
-        for x in 0..map.width {
-            if let Some(tile) = map.get_tile(x, row as i32) {
-                line.push(match tile {
-                    Tile::Floor => '.',
-                    Tile::Wall => '#',
-                    Tile::Door => '+',
-                    Tile::Empty => ' ',
-                });
-            }
-        }
-
-        line.extend(std::iter::repeat(' ').take(width - line.len()));
-
-        print!("{}", line);
-    }
-
-    fn draw_stats_row(&self, player: &Player, row: usize, width: usize) {
-        let stats = match row {
-            0 => " Stats:".to_string(),
-            1 => format!("    HP: {}/100", player.health),
-            2 => format!("    Level: {}", player.level),
-            3 => format!(
-                "    XP: {}/{}",
-                player.experience, player.experience_to_next_level
-            ),
-            4 => format!("    ATK: {}", player.attack),
-            5 => format!("    DEF: {}", player.defense),
-            6 => " Equipment:".to_string(),
-            7 => format!(
-                "    Weapon: {}",
-                player.equipped_weapon.as_ref().map_or("None", |w| &w.name)
-            ),
-            8 => format!(
-                "    Armor: {}",
-                player.equipped_armor.as_ref().map_or("None", |a| &a.name)
-            ),
-            _ => String::new(),
-        };
-
-        if !stats.is_empty() {
-            print!("{}", stats.pad_right(width));
-        } else {
-            print!("{}", " ".repeat(width));
-        }
-    }
-
-    pub fn show_cursor(&self) {
+impl Drop for UI {
+    /// Ensures proper cleanup of terminal state on UI destruction.
+    ///
+    /// - Waits briefly to show final messages
+    /// - Clears the screen
+    /// - Restores cursor visibility
+    fn drop(&mut self) {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        print!("\x1B[2J\x1B[H");
         print!("\x1B[?25h");
         std::io::stdout().flush().unwrap();
     }
-
-    pub fn hide_cursor(&self) {
-        print!("\x1B[?25l");
-        std::io::stdout().flush().unwrap();
-    }
-
-    pub fn get_input_at(&self, row: u16, col: u16) -> String {
-        print!("\x1B[{};{}H", row, col);
-        std::io::stdout().flush().unwrap();
-
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
-        input.trim().to_string()
-    }
-
-    pub fn get_menu_input(&self) -> String {
-        let input_row = self.height - 2;
-        let input_col = (self.width / 2) as u16;
-
-        self.get_input_at(input_row, input_col)
-    }
-
-    pub fn get_player_name(&self) -> String {
-        self.clear_screen();
-        self.draw_name_input_screen();
-
-        let name_prompt = "Name: ";
-        let total_width = name_prompt.len() + 20;
-        let start_pos = (self.width as usize - total_width) / 2;
-        let cursor_pos = start_pos + name_prompt.len() + 1;
-        let input_row = self.height / 2 + 1;
-
-        self.get_input_at(input_row, cursor_pos as u16)
-    }
-
-    fn draw_name_input_screen(&self) {
-        let horizontal_line = "─".repeat(self.width as usize - 2);
-        println!("┌{}┐", horizontal_line);
-
-        let empty_line = format!("│{}│", " ".repeat(self.width as usize - 2));
-
-        for _ in 0..self.height / 3 {
-            println!("{}", empty_line);
-        }
-
-        self.draw_centered_text("What should your hero be called?");
-        println!("{}", empty_line);
-        self.draw_centered_text("Name: ____________________");
-
-        for _ in 0..self.height / 3 {
-            println!("{}", empty_line);
-        }
-
-        println!("└{}┘", horizontal_line);
-    }
-
-    pub fn get_game_input(&self) -> String {
-        let input_row = self.height - 2;
-        let input_col = (self.width - 4) as u16;
-
-        self.get_input_at(input_row, input_col)
-    }
 }
 
-trait PadString {
-    fn pad_right(&self, width: usize) -> String;
-}
-
-impl PadString for String {
-    fn pad_right(&self, width: usize) -> String {
-        if self.len() >= width {
-            self.clone()
-        } else {
-            format!("{}{}", self, " ".repeat(width - self.len()))
-        }
+impl Default for UI {
+    /// Provides default initialization for UI struct.
+    fn default() -> Self {
+        Self::new()
     }
 }
